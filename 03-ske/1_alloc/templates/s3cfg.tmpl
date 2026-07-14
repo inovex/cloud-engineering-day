@@ -1,0 +1,15 @@
+#
+# This config file can be used with s3cmd as
+# s3cmd --config <filename> <command> s3://${s3.bucket}
+# typical commands: info, ls, del --recursive --force
+#
+# Note: You need to empty a bucket before deleting it in STACKIT.
+#
+[default]
+access_key = ${s3.access_key}
+secret_key = ${s3.secret_key}
+host_base = ${s3.bucket}.object.storage.eu01.onstackit.cloud
+host_bucket = %(bucket)s.object.storage.eu01.onstackit.cloud
+bucket_location = EU
+use_https = True
+signature_v2 = False

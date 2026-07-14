@@ -1,0 +1,97 @@
+# values.yaml for the Nextcloud Helm chart (templated by Terraform)
+
+ingress:
+  enabled: true
+  className: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    traefik.ingress.kubernetes.io/service.sticky.cookie: "true"
+    traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
+    traefik.ingress.kubernetes.io/router.middlewares: "nextcloud-nextcloud-redirects@kubernetescrd,nextcloud-nextcloud-headers@kubernetescrd"
+  tls:
+    - hosts:
+        - ${host}.${domain}
+      secretName: ${host}-tls
+
+nextcloud:
+  host: ${host}.${domain}
+  username: admin
+  password: SuperSicher123
+  trustedDomains:
+    - ${host}.${domain}
+    - nextcloud.nextcloud.svc.cluster.local
+  configs:
+    logging.config.php: |
+      <?php
+      $CONFIG = array (
+        'log_type' => 'file',
+        'logfile' => 'nextcloud.log',
+        'loglevel' => 0,
+        'logdateformat' => 'F d, Y H:i:s'
+        );
+  objectStore:
+    s3:
+      enabled: true
+      host: ${s3.host}
+      bucket: ${s3.bucket}
+      accessKey: ${s3.access_key}
+      secretKey: ${s3.secret_key}
+      # Typical settings for s3-compatible providers:
+      ssl: true
+      port: 443
+      region: eu-west-1
+      usePathStyle: true
+  extraInitContainers:
+    - name: fix-pvc-permissions
+      image: bash:5
+      command: ["bash", "-x", "-c"]
+      args: # uid=gid=33 is typically www-data
+        - |
+          [ -f /var/www/html/permissions-fixed.flag ] && { echo "Permissions fine"; exit 0; };
+          mkdir -p /var/www/html/{config,data,custom_apps,themes};
+          chown -R 33:33 /var/www/html;
+          chmod -R u+rwX,g+rwX /var/www/html;
+          touch /var/www/html/permissions-fixed.flag;
+      securityContext:
+        runAsUser: 0
+        runAsGroup: 0
+      volumeMounts:
+        - name: nextcloud-main
+          mountPath: /var/www/html
+
+service:
+  type: ClusterIP
+
+internalDatabase:
+  enabled: false
+
+externalDatabase:
+  enabled: true
+  type: mysql
+  host: "${mariadb.hostname}:${mariadb.port}"
+  database: ${mariadb.database_name}
+  user: ${mariadb.username}
+  password: ${mariadb.password}
+
+persistence:
+  enabled: true
+  accessMode: ReadWriteMany
+
+metrics: # sidecar collector
+  enabled: true
+  info:
+    apps: true
+
+hpa: # HorizontalPodAutoscaler
+  enabled: true
+  cputhreshold: 60
+  minPods: 1
+  maxPods: ${maxPods}
+
+resources: # needed for hpa
+  requests:
+    cpu: 800m
+    memory: 900Mi
+  limits:
+    cpu: 3
+    memory: 2Gi
