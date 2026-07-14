@@ -1,0 +1,20 @@
+name: hello-world
+on: push
+jobs:
+  demo-job:
+    runs-on: stackit-docker
+    steps:
+    - name: my-step
+      run: echo "Hello World!"
+    - run: |
+        mkdir -p artifacts
+        echo hello > artifacts/one.txt
+        echo world > artifacts/two.txt
+    - uses: actions/upload-artifact@v3
+      with:
+        name: demo-artifacts
+        path: artifacts/
+    - uses: actions/upload-artifact@v3
+      with:
+        name: single-artifact
+        path: artifacts/one.txt

@@ -1,0 +1,200 @@
+alloy:
+  securityContext:
+    privileged: true
+    runAsUser: 0
+
+  # otelcol.receiver.filelog is "Public preview"
+  stabilityLevel: "public-preview"
+
+  # Enable clustering so each prometheus.scrape target is owned by exactly one pod — no duplicate metrics.
+  clustering:
+    enabled: true
+
+  # Make sure to load secrets from secrets, instead of hard-coding them in the configMap.
+  extraEnv:
+  - name: STACKIT_USERNAME
+    valueFrom:
+      secretKeyRef:
+        name: alloy-stackit-credentials
+        key: USERNAME
+  - name: STACKIT_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: alloy-stackit-credentials
+        key: PASSWORD
+  - name: STACKIT_OTLP_LOGS_ENDPOINT
+    valueFrom:
+      secretKeyRef:
+        name: alloy-stackit-credentials
+        key: OTLP_LOGS_ENDPOINT
+  - name: STACKIT_METRICS_PUSH_URL
+    valueFrom:
+      secretKeyRef:
+        name: alloy-stackit-credentials
+        key: METRICS_PUSH_URL
+
+  mounts:
+    varlog: true # to read pod logs
+
+  configMap:
+    content: |
+      logging {
+        level = "info"
+      }
+
+      // ─── Shared auth ─────────────────────────────────────────────────────────────
+      otelcol.auth.basic "stackit" {
+        username = sys.env("STACKIT_USERNAME")
+        password = sys.env("STACKIT_PASSWORD")
+      }
+
+      // ─── Log collection ──────────────────────────────────────────────────────────
+      // Reads container log files directly from the node, parses CRI-O/containerd
+      // format, enriches with k8s.* resource attributes via the Kubernetes API, and
+      // ships to STACKIT Observability via OTLP HTTP.
+
+      otelcol.receiver.filelog "pods" {
+        include           = ["/var/log/pods/*/*/*.log"]
+        include_file_path = true
+        include_file_name = false
+        start_at          = "end"
+
+        operators = [
+          { type = "container" },
+        ]
+
+        output {
+          logs = [otelcol.processor.k8sattributes.default.input]
+        }
+      }
+
+      // Enriches log records with additional Kubernetes metadata
+      otelcol.processor.k8sattributes "default" {
+        pod_association {
+          source {
+            from = "resource_attribute"
+            name = "k8s.pod.uid"
+          }
+        }
+
+        extract {
+          metadata = [
+            "k8s.namespace.name",
+            "k8s.pod.name",
+            "k8s.container.name",
+            "k8s.deployment.name",
+            "k8s.daemonset.name",
+            "k8s.statefulset.name",
+            "k8s.node.name",
+          ]
+        }
+
+        output {
+          logs = [otelcol.exporter.otlphttp.stackit.input]
+        }
+      }
+
+      otelcol.exporter.otlphttp "stackit" {
+        client {
+          endpoint = sys.env("STACKIT_OTLP_LOGS_ENDPOINT")
+          auth     = otelcol.auth.basic.stackit.handler
+        }
+      }
+
+      // ─── Metrics collection ───────────────────────────────────────────────────────
+      // STACKIT Observability has no OTLP metrics endpoint, so Prometheus Remote
+      // Write is used
+
+      // Scrapes the Nextcloud exporter sidecar
+      prometheus.scrape "nextcloud" {
+        targets = [{
+          __address__ = "nextcloud-metrics.nextcloud.svc.cluster.local:9100",
+        }]
+        scrape_interval = "1m"
+        scrape_timeout  = "30s"
+        metrics_path    = "/metrics"
+        forward_to      = [prometheus.remote_write.stackit.receiver]
+
+        // Clustering ensures exactly one pod in the DaemonSet scrapes this
+        clustering {
+          enabled = true
+        }
+      }
+
+      // Scrapes Alloy itself
+      prometheus.scrape "alloy" {
+        targets = [{
+          __address__ = "localhost:12345",
+        }]
+        scrape_interval = "1m"
+        scrape_timeout  = "30s"
+        metrics_path    = "/metrics"
+        forward_to      = [prometheus.remote_write.stackit.receiver]
+
+        // since we scrape "localhost", clustering ensures that each pod scrapes only itself
+        clustering {
+          enabled = true
+        }
+      }
+
+      // cAdvisor metrics via kubelet
+      discovery.kubernetes "nodes" {
+        role = "node"
+      }
+
+      discovery.relabel "cadvisor" {
+        targets = discovery.kubernetes.nodes.targets
+        rule {
+          source_labels = ["__meta_kubernetes_node_address_InternalIP"]
+          target_label  = "__address__"
+          replacement   = "$1:10250"
+        }
+        rule {
+          target_label = "__metrics_path__"
+          replacement  = "/metrics/cadvisor"
+        }
+        rule {
+          target_label = "__scheme__"
+          replacement  = "https"
+        }
+      }
+
+      prometheus.scrape "cadvisor" {
+        targets         = discovery.relabel.cadvisor.output
+        scrape_interval = "1m"
+        scrape_timeout  = "30s"
+        bearer_token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+        tls_config {
+          insecure_skip_verify = true
+        }
+        forward_to = [prometheus.remote_write.stackit.receiver]
+
+        clustering {
+          enabled = true
+        }
+      }
+
+      prometheus.remote_write "stackit" {
+        endpoint {
+          url = sys.env("STACKIT_METRICS_PUSH_URL")
+          basic_auth {
+            username = sys.env("STACKIT_USERNAME")
+            password = sys.env("STACKIT_PASSWORD")
+          }
+        }
+      }
+
+controller:
+  type: daemonset
+  hostPID: false
+
+# k8sattributes needs list/watch access to replicasets and deployments
+# to resolve deployment names (the default RBAC only covers pods/namespaces).
+rbac:
+  extraRules:
+  - apiGroups: ["apps"]
+    resources: ["replicasets", "deployments", "daemonsets", "statefulsets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["nodes/metrics"]
+    verbs: ["get"]

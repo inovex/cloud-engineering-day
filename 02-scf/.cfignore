@@ -1,0 +1,9 @@
+node_modules
+htdocs/node_modules
+.git
+# FORCE Cloud Foundry to upload the lib directory
+!htdocs/lib/
+!htdocs/lib/*
+README.md
+prepare-nextcloud-on-scf.sh
+vars.yaml

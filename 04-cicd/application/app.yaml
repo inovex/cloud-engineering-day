@@ -1,0 +1,22 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: podinfo
+  namespace: argocd
+spec:
+  project: default
+  source:
+    # TODO: Replace with your STACKIT Forgejo repository URL
+    # e.g. https://foo.git.onstackit.cloud/my-user/cloud-engineering-day.git
+    repoURL: 'https://maboe.git.onstackit.cloud/marcel.boehm/cloud-engineering-day.git'
+    targetRevision: main
+    path: 04-cicd/application
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: podinfo1
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true

@@ -1,0 +1,8 @@
+.terraform
+.DS_Store
+*.tfstate
+*.tfstate.backup
+.terraform.lock.hcl
+sa_key.json
+terraform.tfvars
+jumphost.conf
