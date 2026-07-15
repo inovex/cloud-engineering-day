@@ -1,6 +1,6 @@
 resource "stackit_ske_cluster" "this" {
   project_id = var.project_id
-  name       = "${var.name_prefix}-m23-${var.name_suffix}"
+  name       = "${var.name_prefix}-m23" # The cannot be longer than 11 characters, so we just use the prefix
 
   node_pools = [
     {
@@ -26,10 +26,10 @@ resource "stackit_ske_cluster" "this" {
       enabled = true,
       zones   = [stackit_dns_zone.this.dns_name]
     }
-    observability = {
-      enabled     = true
-      instance_id = stackit_observability_instance.this.instance_id
-    }
+    # observability = {
+    #   enabled     = true
+    #   instance_id = stackit_observability_instance.this.instance_id
+    # }
   }
 }
 

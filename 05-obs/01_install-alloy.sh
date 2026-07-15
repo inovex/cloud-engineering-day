@@ -14,7 +14,7 @@ EOF
 
 # Apply credentials Secret before Helm install.
 # Edit secret.yaml with your credentials first!
-kubectl apply -f --server-side secret.yaml
+kubectl apply --server-side -f secret.yaml
 
 helm upgrade --install alloy grafana/alloy \
   --namespace observability \

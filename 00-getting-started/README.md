@@ -29,7 +29,7 @@ The STACKIT command-line interface for managing cloud resources.
 **Verify installation:**
 
 ```bash
-stackit version
+stackit --version
 # should be v0.65+
 ```
 

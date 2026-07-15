@@ -34,6 +34,11 @@ variable "name_prefix" {
     Attention: Assert that Name prefix + name suffix string length <= 11, because SKE node pool has a maximum length of 15.
     That is, a rule of thumb is a name prefix and name suffix not exceed 4 characters each in length!
   EOT
+
+  validation {
+    condition     = length(var.name_prefix) <= 5
+    error_message = "The name prefix must not exceed 5 characters in length."
+  }
 }
 
 variable "name_suffix" {

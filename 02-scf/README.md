@@ -49,7 +49,7 @@ The `config.php` file sets `trusted_domains` to `*` so that CF's dynamically ass
 ## Step 2: Deploy to SCF
 
 > [!IMPORTANT]
-> Push the application:
+> Set a application name in `manifest.yaml` and deploy it:
 >
 > ```bash
 > cf push

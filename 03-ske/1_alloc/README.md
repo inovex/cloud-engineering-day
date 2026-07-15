@@ -68,7 +68,17 @@ After `terraform apply` completes, check the `generated/` directory for:
 - `tf_output.env`: Environment variables (domain, database credentials, etc.)
 - `nextcloud_chart_values.yml`: Pre-filled Helm deployment values
 
-## Part 3: Verify Deployment
+## Part 3: Enable Observability Extension
+
+In `ske.tf`, uncomment the block that configures the Observability Extension in
+your SKE cluster. Run `terraform apply` to apply the changes.
+
+> [!NOTE]
+> We could have configured the extension from the start - but because
+> terraform always waits until dependent resources are completely ready,
+> this would have increased the overall creation time a lot.
+
+## Part 4: Verify Deployment
 
 Once `terraform apply` completes:
 

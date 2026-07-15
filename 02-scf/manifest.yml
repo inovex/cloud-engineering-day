@@ -1,10 +1,9 @@
 applications:
-- name: nextcloud-scf
+- name: <your-app-name>
   memory: 4096M
   disk_quota: 4G
   instances: 1
   buildpack: php_buildpack
   path: .
-
   env:
     BP_WEB_DIR: "htdocs"

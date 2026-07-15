@@ -6,6 +6,8 @@ resource "stackit_mariadb_instance" "this" {
   parameters = {
     sgw_acl = "193.148.160.0/19,45.129.40.0/21,45.135.244.0/22,0.0.0.0/0" # TODO global reachability
   }
+
+  
 }
 
 resource "stackit_mariadb_credential" "this" {
